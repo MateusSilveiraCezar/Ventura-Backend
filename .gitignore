@@ -1,0 +1,36 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+log/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Prisma (caso use)
+prisma/dev.db
+prisma/dev.db-journal
+
+# Testes e relatórios
+coverage/
+jest-coverage/
