@@ -10,11 +10,14 @@ COPY package*.json ./
 # Instalar as dependências
 RUN npm install
 
-# Copiar todo o código da aplicação para dentro do container
+# Copiar os arquivos da aplicação para dentro do container
 COPY . .
 
-# Expor a porta 3000 (ou a porta que sua aplicação usa)
+# Compilar os arquivos TypeScript para JavaScript
+RUN npm run build  # Gera a pasta dist/ com o arquivo compilado
+
+# Expor a porta que a aplicação vai rodar
 EXPOSE 3000
 
-# Comando para iniciar a aplicação
-CMD ["npm", "start"]
+# Rodar a aplicação a partir do arquivo compilado em dist/
+CMD ["node", "dist/server.js"] 
