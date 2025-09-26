@@ -19,7 +19,7 @@ dotenv.config();
 console.clear();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 80;
 const frontendUrl = process.env.FRONTEND_URL || 'https://www.painelventura.com.br';
 
 // Configura CORS para permitir o frontend em todas as rotas
