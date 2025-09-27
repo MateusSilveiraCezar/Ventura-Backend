@@ -1,72 +1,73 @@
-import nodemailer from "nodemailer";
+import sgMail from '@sendgrid/mail';
 import dotenv from "dotenv";
 
-dotenv.config(); // Garante que as variáveis de ambiente estão carregadas localmente
+// Importante: Não tente ler o .env em produção, confie apenas no Render.
+if (process.env.NODE_ENV !== 'production') {
+    dotenv.config(); 
+}
 
 class EmailService {
-  private transporter;
+  private apiKey: string;
+  private fromEmail: string;
 
   constructor() {
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASS;
-    const emailHost = process.env.EMAIL_HOST;
-    // Tenta usar a porta 587 por padrão se não estiver definida
-    const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT, 10) : 587; 
-
-    if (!emailUser || !emailPass || !emailHost) {
-      console.error("⚠️ Credenciais de e-mail (USER, PASS ou HOST) não estão definidas nas variáveis de ambiente.");
-      // Lança erro apenas se não estiver em ambiente de produção (onde o Render injeta as variáveis)
+    // Para a API REST, o EMAIL_PASS deve ser a chave de API do SendGrid.
+    this.apiKey = process.env.EMAIL_PASS as string; 
+    // O EMAIL_USER será o endereço "De" que o SendGrid irá autenticar.
+    this.fromEmail = process.env.EMAIL_USER as string; 
+    
+    if (!this.apiKey || !this.fromEmail) {
+      console.error("⚠️ SendGrid API Key ou FROM EMAIL não estão definidos. Verifique as variáveis do Render.");
       if (process.env.NODE_ENV !== 'production') {
-          throw new Error("Credenciais de e-mail ausentes. Verifique o .env");
+          throw new Error("Credenciais do SendGrid ausentes.");
       }
     }
 
-    // Configuração SMTP Flexível
-    this.transporter = nodemailer.createTransport({
-      host: emailHost, // <-- O Render precisa de um host que aceite conexões
-      port: emailPort,   // <-- A porta deve ser permitida pelo Render (ex: 2525)
-      secure: emailPort === 465, // Use SSL/TLS se for a porta 465
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-      // Adiciona um timeout maior para evitar que o NodeMailer desista muito rápido
-      connectionTimeout: 10000, // 10 segundos
-    });
+    // Configura o SendGrid SDK com a chave de API.
+    // Esta configuração usa HTTPS, o que o Render não bloqueia.
+    sgMail.setApiKey(this.apiKey);
 
-    console.log(`✅ Transportador SMTP configurado para Host: ${emailHost}:${emailPort}`);
+    console.log(`✅ Transportador SendGrid via API configurado.`);
   }
 
+  /**
+   * Envia o e-mail usando a API REST do SendGrid.
+   */
   async enviarEmail(destinatario: string, tarefas: string[]) {
     if (!destinatario) {
       console.error("Destinatário não informado");
       return;
     }
 
-    console.log(`📧 Tentando enviar e-mail para: ${destinatario}`);
-    console.log("📋 Tarefas a enviar:", tarefas);
+    console.log(`📧 Tentando enviar e-mail via API para: ${destinatario}`);
+
+    const msg = {
+      to: destinatario,
+      from: {
+        email: this.fromEmail,
+        name: "Sistema Imobiliária Ventura"
+      },
+      subject: "Tarefas em Andamento",
+      html: `
+        <h2>Olá!</h2>
+        <p>Você possui as seguintes tarefas em andamento:</p>
+        <ul>
+          ${tarefas.map(t => `<li>${t}</li>`).join("")}
+        </ul>
+      `,
+    };
 
     try {
-      const info = await this.transporter.sendMail({
-        from: `"Sistema Imobiliária" <${process.env.EMAIL_USER}>`,
-        to: destinatario,
-        subject: "Tarefas em andamento",
-        html: `
-          <h2>Olá!</h2>
-          <p>Você possui as seguintes tarefas em andamento:</p>
-          <ul>
-            ${tarefas.map(t => `<li>${t}</li>`).join("")}
-          </ul>
-        `
-      });
+      // O método send() realiza uma requisição HTTPS (Porta 443) para os servidores do SendGrid.
+      await sgMail.send(msg);
 
-      console.log(`✅ E-mail enviado com sucesso para ${destinatario}`);
-      console.log("Mensagem ID:", info.messageId);
-      return info;
-    } catch (err) {
-      console.error("❌ Erro ao enviar e-mail:", err);
-      // O erro 'ETIMEDOUT' virá daqui se o Render bloquear a porta.
-      throw err; // relança para ser tratado no controller
+      console.log(`✅ E-mail enviado com sucesso via SendGrid API para ${destinatario}`);
+      return { success: true };
+    } catch (error: any) {
+      // A API REST retorna erros como 401 ou 403, não ETIMEDOUT.
+      const errorMessage = error.response?.body?.errors?.[0]?.message || error.message;
+      console.error("❌ Erro ao enviar e-mail via API:", errorMessage);
+      throw new Error(`Falha no envio de e-mail via API: ${errorMessage}`);
     }
   }
 }
