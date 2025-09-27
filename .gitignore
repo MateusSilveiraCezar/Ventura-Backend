@@ -34,3 +34,5 @@ prisma/dev.db-journal
 # Testes e relatórios
 coverage/
 jest-coverage/
+
+.env
