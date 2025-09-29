@@ -5,7 +5,7 @@ import EmailService from "../services/email.service";
 import WhatsappService from "../services/whatsapp.service"; // integração WA
 
 // Base do seu painel/app
-const BASE_URL = "https://www.painelventura.com";
+const BASE_URL = "https://www.painelventura.com.br";
 
 // Lista todos os processos com etapas e já atualiza status se concluído
 export async function listarProcessos(req: Request, res: Response) {
