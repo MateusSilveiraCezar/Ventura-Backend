@@ -100,7 +100,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
         };
 
         // Base do seu painel/app
-        const BASE_URL = "https://www.painelventura.com.br";
+        const BASE_URL = "https://www.painelventura.com";
 
         // URL COMPLETA (para e-mail) — clique vai direto para a etapa
         const urlCompleta = `${BASE_URL}/processos/${proxima.processo_id}/etapas/${proxima.id}`;

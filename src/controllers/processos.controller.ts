@@ -5,7 +5,7 @@ import EmailService from "../services/email.service";
 import WhatsappService from "../services/whatsapp.service"; // integração WA
 
 // Base do seu painel/app
-const BASE_URL = "https://www.painelventura.com.br";
+const BASE_URL = "https://www.painelventura.com";
 
 // Lista todos os processos com etapas e já atualiza status se concluído
 export async function listarProcessos(req: Request, res: Response) {
@@ -354,9 +354,9 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
             const contato = usuarioRows[0] as { email?: string; nome?: string; telefone?: string };
 
             // URL completa para e-mail
-            const urlCompleta = `${BASE_URL}/processos/${processo_id}/etapas/${etapa_id}`;
+            const urlCompleta = `${BASE_URL}/`;
             // Sufixo dinâmico para o botão do template
-            const urlSuffix = `processos/${processo_id}/etapas/${etapa_id}`;
+            const urlSuffix = `login`;
 
             const corpoEmail = [
               `Olá ${contato.nome ?? ""},`,
