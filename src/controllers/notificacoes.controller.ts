@@ -103,11 +103,11 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
         const BASE_URL = "https://www.painelventura.com";
 
         // URL COMPLETA (para e-mail) — clique vai direto para a etapa
-        const urlCompleta = `${BASE_URL}/processos/${proxima.processo_id}/etapas/${proxima.id}`;
+        const urlCompleta = `${BASE_URL}/`;
 
         // SUFIXO para o botão DINÂMICO do template ({{1}})
         // Se seu botão for ESTÁTICO, envie a URL COMPLETA no parameters (ver comentário mais abaixo).
-        const urlSuffix = `processos/${proxima.processo_id}/etapas/${proxima.id}`;
+        const urlSuffix = `login`;
 
         const assuntoEmail = `Nova tarefa: ${proxima.nome}`;
         const corpoEmail = [
