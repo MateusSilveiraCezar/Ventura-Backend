@@ -4,11 +4,13 @@ import {
   criarUsuario,
   atualizarUsuario,
   deletarUsuario,
-  resetarSenha
+  resetarSenha,
+  listarFuncionarios
 } from '../controllers/usuarios.controller';
 
 const usuariosRouter = Router();
 
+usuariosRouter.get('/funcionarios', listarFuncionarios)
 usuariosRouter.get('/', listarUsuarios);
 usuariosRouter.post('/', criarUsuario);
 usuariosRouter.put('/:id', atualizarUsuario);

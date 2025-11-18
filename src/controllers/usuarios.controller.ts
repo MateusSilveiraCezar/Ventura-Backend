@@ -12,6 +12,17 @@ export const listarUsuarios = async (req: Request, res: Response) => {
   }
 };
 
+export const listarFuncionarios = async (req: Request, res: Response) => {
+  try {
+    // A consulta agora usa WHERE para filtrar pela coluna 'role' com o valor 'funcionario'
+    const result = await pool.query("SELECT * FROM usuarios WHERE role = 'funcionario'");
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao buscar funcionários' });
+  }
+};
+
 export const criarUsuario = async (req: Request, res: Response) => {
   const { nome, email, telefone, senha, role } = req.body;
 
