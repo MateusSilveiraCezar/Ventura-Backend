@@ -41,7 +41,18 @@ app.use((req, res, next) => {
 // Middleware para interpretar JSON no body
 app.use(express.json());
 
-// Rotas
+// --- ROTA DEDICADA PARA KEEP-ALIVE (STATUS) ---
+// O Uptime Robot deve ser configurado para pingar esta URL:
+// https://seuapp.onrender.com/status
+app.get('/status', (req, res) => {
+    // Retorna 200 OK. Isso garante que o Uptime Robot sempre verá
+    // o servidor como "UP" e o Render o manterá acordado.
+    res.status(200).json({ status: 'UP', service: 'ventura-backend' });
+});
+// ---------------------------------------------
+
+
+// Rotas Específicas da Aplicação
 app.use('/usuarios', usuariosRouter);
 app.use('/login', loginUsuario);
 app.use('/tipos-processo', tipoProcessoRouter);
