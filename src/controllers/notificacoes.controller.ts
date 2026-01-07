@@ -100,7 +100,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
         };
 
         // Base do seu painel/app
-        const BASE_URL = "https://www.painelventura.com";
+        const BASE_URL = "https://www.painelventura.com.br/login";
 
         // URL COMPLETA (para e-mail) — clique vai direto para a etapa
         const urlCompleta = `${BASE_URL}/`;
@@ -114,7 +114,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           `Olá ${contato.nome ?? ""},`,
           `Você recebeu uma nova tarefa: ${proxima.nome}.`,
           `Acesse o sistema para mais detalhes:`,
-          urlCompleta,
+          BASE_URL,
         ].join("\n\n");
 
         // Executa os envios em paralelo; falha de um canal não bloqueia o outro
@@ -140,7 +140,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
                 {
                   index: 0,
                   sub_type: "url",
-                  parameters: [urlSuffix], // <<<< só o sufixo "{{1}}"
+                  parameters: [BASE_URL], // <<<< só o sufixo "{{1}}"
                 },
               ],
 

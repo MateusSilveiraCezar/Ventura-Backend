@@ -5,7 +5,7 @@ import EmailService from "../services/email.service";
 import WhatsappService from "../services/whatsapp.service"; // integração WA
 
 // Base do seu painel/app
-const BASE_URL = "https://www.painelventura.com";
+const BASE_URL = "https://www.painelventura.com.br/login";
 
 // Lista todos os processos com etapas e já atualiza status se concluído
 export async function listarProcessos(req: Request, res: Response) {
@@ -218,16 +218,11 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
         if (usuarioRows.length > 0) {
           const contato = usuarioRows[0] as { email?: string; nome?: string; telefone?: string };
 
-          // URL completa para o e-mail
-          const urlCompleta = `${BASE_URL}/processos/${processo_id}/etapas/${etapa_id}`;
-          // Sufixo dinâmico para o botão do template ({{1}})
-          const urlSuffix = `processos/${processo_id}/etapas/${etapa_id}`;
-
           const corpoEmail = [
             `Olá ${contato.nome ?? ""},`,
             `Você recebeu a tarefa: ${etapa.nome} no processo ${processo.nome}.`,
             `Acesse o sistema para mais detalhes:`,
-            urlCompleta,
+            BASE_URL,
           ].join("\n\n");
 
           const jobs: Promise<any>[] = [];
@@ -243,7 +238,7 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
                 lang: "pt_BR",
                 bodyParams: [contato.nome ?? "", etapa.nome], // {{1}} e {{2}} do corpo
                 buttonParams: [
-                  { index: 0, sub_type: "url", parameters: [urlSuffix] }, // <<< só o sufixo {{1}}
+                  { index: 0, sub_type: "url", parameters: [BASE_URL] }, // <<< só o sufixo {{1}}
                 ],
               })
             );
@@ -362,7 +357,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
               `Olá ${contato.nome ?? ""},`,
               `Você recebeu uma nova tarefa: ${etapa.nome}.`,
               `Acesse o sistema para mais detalhes:`,
-              urlCompleta,
+              BASE_URL,
             ].join("\n\n");
 
             const jobs: Promise<any>[] = [];
@@ -378,7 +373,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
                   lang: "pt_BR",
                   bodyParams: [contato.nome ?? "", etapa.nome],
                   buttonParams: [
-                    { index: 0, sub_type: "url", parameters: [urlSuffix] },
+                    { index: 0, sub_type: "url", parameters: [BASE_URL] },
                   ],
                 })
               );
