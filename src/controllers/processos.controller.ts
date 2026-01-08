@@ -1,11 +1,10 @@
-// controllers/processos.controller.ts
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import WhatsappService from "../services/whatsapp.service"; // integração WA
+import WhatsappService from "../services/whatsapp.service";
 
-// Base do seu painel/app
-const BASE_URL = "https://www.painelventura.com.br/login";
+// URL Base limpa
+const BASE_URL = "https://www.painelventura.com.br";
 
 // Lista todos os processos com etapas e já atualiza status se concluído
 export async function listarProcessos(req: Request, res: Response) {
@@ -236,9 +235,13 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
                 to: contato.telefone,
                 template: "aviso_funcionario",
                 lang: "pt_BR",
-                bodyParams: [contato.nome ?? "", etapa.nome], // {{1}} e {{2}} do corpo
+                bodyParams: [contato.nome ?? "", etapa.nome], 
                 buttonParams: [
-                  { index: 0, sub_type: "url", parameters: [BASE_URL] }, // <<< só o sufixo {{1}}
+                  { 
+                    index: 0, 
+                    sub_type: "url", 
+                    parameters: ["/"] // FIX: Envia apenas "/" para o link base
+                  }, 
                 ],
               })
             );
@@ -328,6 +331,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
           ]
         );
 
+        // Se o status mudou para 'em andamento', dispara notificação
         if (novoStatus === "em andamento" && etapa.usuario_id) {
           await client.query(
             `INSERT INTO notificacoes (usuario_id, etapa_id, mensagem)
@@ -347,11 +351,6 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
 
           if (usuarioRows.length > 0) {
             const contato = usuarioRows[0] as { email?: string; nome?: string; telefone?: string };
-
-            // URL completa para e-mail
-            const urlCompleta = `${BASE_URL}/`;
-            // Sufixo dinâmico para o botão do template
-            const urlSuffix = `login`;
 
             const corpoEmail = [
               `Olá ${contato.nome ?? ""},`,
@@ -373,7 +372,11 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
                   lang: "pt_BR",
                   bodyParams: [contato.nome ?? "", etapa.nome],
                   buttonParams: [
-                    { index: 0, sub_type: "url", parameters: [BASE_URL] },
+                    { 
+                      index: 0, 
+                      sub_type: "url", 
+                      parameters: ["/"] // FIX: Envia apenas "/" para o link base
+                    }, 
                   ],
                 })
               );
