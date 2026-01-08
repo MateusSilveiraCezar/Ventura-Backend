@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import WhatsappService from "../services/whatsapp.service";
+import WhatsappService from "../services/whatsapp.service"; // integração WA
 
-// URL Base limpa
+// URL Base limpa para e-mail
 const BASE_URL = "https://www.painelventura.com.br";
 
 // Lista todos os processos com etapas e já atualiza status se concluído
@@ -235,12 +235,13 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
                 to: contato.telefone,
                 template: "aviso_funcionario",
                 lang: "pt_BR",
-                bodyParams: [contato.nome ?? "", etapa.nome], 
+                bodyParams: [contato.nome ?? "", etapa.nome],
                 buttonParams: [
                   { 
                     index: 0, 
                     sub_type: "url", 
-                    parameters: ["/"] // FIX: Envia apenas "/" para o link base
+                    // FIX: "login" é um parâmetro seguro
+                    parameters: ["login"] 
                   }, 
                 ],
               })
@@ -375,7 +376,8 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
                     { 
                       index: 0, 
                       sub_type: "url", 
-                      parameters: ["?ref=app"] // FIX: Envia apenas "/" para o link base
+                      // FIX: "login" é um parâmetro seguro
+                      parameters: ["login"] 
                     }, 
                   ],
                 })

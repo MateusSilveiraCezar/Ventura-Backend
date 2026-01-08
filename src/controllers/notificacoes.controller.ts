@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import WhatsappService from "../services/whatsapp.service";
+import WhatsappService from "../services/whatsapp.service"; // integração WA
 
-// URL Base limpa
+// URL Base limpa para o e-mail
 const BASE_URL = "https://www.painelventura.com.br";
 
 // Buscar todas as tarefas pendentes ou em andamento de um usuário
@@ -41,7 +41,7 @@ export const getTarefasPorUsuario = async (req: Request, res: Response) => {
   }
 };
 
-// Finalizar uma tarefa e notificar a próxima
+// Finalizar uma tarefa
 export const finalizarTarefa = async (req: Request, res: Response) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: "ID da tarefa é obrigatório" });
@@ -88,7 +88,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
         ]
       );
 
-      // Busca contato do usuário responsável
+      // Busca contato do usuário responsável (email + telefone)
       const { rows: usuarioRows } = await pool.query(
         `SELECT email, nome, telefone FROM usuarios WHERE id = $1`,
         [proxima.usuario_id]
@@ -116,7 +116,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           jobs.push(EmailService.enviarEmail(contato.email, [corpoEmail]));
         }
 
-        // WhatsApp
+        // WhatsApp (template aprovado)
         if (contato.telefone) {
           jobs.push(
             WhatsappService.sendTemplate({
@@ -128,8 +128,8 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
                 {
                   index: 0,
                   sub_type: "url",
-                  // FIX: Envia apenas "/" para que o link fique na raiz
-                  parameters: ["?ref=app"], 
+                  // FIX: "login" é um parâmetro seguro que gera URL válida
+                  parameters: ["login"], 
                 },
               ],
             })
@@ -164,7 +164,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
 
 // Contar etapas pendentes
 export const contarEtapasPendentes = async (req: Request, res: Response) => {
-  const usuario_id = req.params.usuario_id;
+  const usuario_id = req.params.usuario_id; // ou pegar do JWT
 
   try {
     const result = await pool.query(
