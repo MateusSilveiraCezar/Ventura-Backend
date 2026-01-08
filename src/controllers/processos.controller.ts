@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import { N8nService } from "../services/n8n.service"; // ✅ Correção 1: Importação com chaves
+import { N8nService } from "../services/n8n.service"; 
 
 const BASE_URL = "https://www.painelventura.com.br";
 
@@ -148,7 +148,6 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
           
           if (contato.email) {
              const corpoEmail = [`Olá ${contato.nome}, tarefa: ${etapa.nome}`, BASE_URL].join("\n\n");
-             // ✅ Aqui já estava correto, mantendo
              EmailService.enviarEmail(contato.email, [corpoEmail]).catch(console.error);
           }
 
@@ -156,6 +155,7 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
             await N8nService.notificarNovaTarefa({
               nome: contato.nome ?? "Colaborador",
               telefone: contato.telefone,
+              email: contato.email,
               tarefa: etapa.nome,
               processo: processo.nome,
               link: BASE_URL
@@ -205,20 +205,25 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
     }
 
     for (const etapa of etapas) {
+      // 1. Busca dados ANTIGOS do banco para comparação
       const resEtapa = await client.query(
-        `SELECT id, status, ordem FROM etapas WHERE processo_id = $1 AND nome = $2`,
+        `SELECT id, status, ordem, usuario_id FROM etapas WHERE processo_id = $1 AND nome = $2`,
         [processo_id, etapa.nome]
       );
 
       if ((resEtapa.rowCount ?? 0) > 0) {
         const etapa_id = resEtapa.rows[0].id;
         const statusAtual = resEtapa.rows[0].status;
+        const usuarioAtualNoBanco = resEtapa.rows[0].usuario_id; // QUEM ESTAVA ANTES?
+
         let novoStatus = statusAtual;
         
+        // Só muda status se não estiver finalizada
         if (etapa.status && statusAtual !== 'finalizada') {
           novoStatus = etapa.status;
         }
 
+        // 2. Atualiza no Banco
         await client.query(
           `UPDATE etapas
            SET usuario_id = $1, prazo = $2, urgencia = $3, observacoes = $4,
@@ -235,8 +240,16 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
           ]
         );
 
-        // Se status mudou para 'em andamento', notifica
-        if (novoStatus === "em andamento" && etapa.usuario_id) {
+        // --- LÓGICA CORRIGIDA PARA ATRIBUIÇÃO TARDIA ---
+        // Verifica se houve mudança de usuário
+        const usuarioMudou = etapa.usuario_id && (Number(etapa.usuario_id) !== Number(usuarioAtualNoBanco));
+        
+        // Deve notificar se:
+        // A) O status mudou para 'em andamento'
+        // B) O status JÁ ERA 'em andamento', mas o usuário acabou de mudar (atribuição tardia)
+        const deveNotificar = (novoStatus === "em andamento") && (statusAtual !== "em andamento" || usuarioMudou);
+
+        if (deveNotificar && etapa.usuario_id) {
           await client.query(
             `INSERT INTO notificacoes (usuario_id, etapa_id, mensagem)
              VALUES ($1, $2, $3)
@@ -254,7 +267,6 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
             
             if (contato.email) {
                 const corpoEmail = [`Nova tarefa: ${etapa.nome}`, BASE_URL].join("\n\n");
-                // ✅ Correção 2: Adicionados os colchetes [] em volta de corpoEmail
                 EmailService.enviarEmail(contato.email, [corpoEmail]).catch(console.error);
             }
 
@@ -262,6 +274,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
               await N8nService.notificarNovaTarefa({
                 nome: contato.nome ?? "Colaborador",
                 telefone: contato.telefone,
+                email: contato.email,
                 tarefa: etapa.nome,
                 link: BASE_URL
               });

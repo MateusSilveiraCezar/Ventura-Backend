@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import { N8nService } from "../services/n8n.service"; // <--- CORREÇÃO 1: Chaves {}
+import { N8nService } from "../services/n8n.service"; 
 
 const BASE_URL = "https://www.painelventura.com.br";
 
@@ -63,6 +63,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
       if (usuarioRows.length > 0) {
         const contato = usuarioRows[0];
         
+        // Envia email pelo backend (opcional, já que agora vai pro n8n também)
         if (contato.email) {
           const corpoEmail = [
             `Olá ${contato.nome ?? ""},`,
@@ -74,10 +75,12 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           EmailService.enviarEmail(contato.email, [corpoEmail]).catch(console.error);
         }
 
+        // Webhook N8N
         if (contato.telefone) {
           await N8nService.notificarNovaTarefa({
             nome: contato.nome ?? "Colaborador",
             telefone: contato.telefone,
+            email: contato.email, // <--- ADICIONADO AQUI
             tarefa: proxima.nome,
             link: BASE_URL 
           });
