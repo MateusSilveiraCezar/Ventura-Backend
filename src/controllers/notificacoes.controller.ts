@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import WhatsappService from "../services/whatsapp.service"; // integração WA
+import N8nService from "../services/n8n.service"; // <--- Novo serviço
 
-// URL Base limpa para o e-mail
+// URL Base limpa
 const BASE_URL = "https://www.painelventura.com.br";
 
 // Buscar todas as tarefas pendentes ou em andamento de um usuário
@@ -15,12 +15,7 @@ export const getTarefasPorUsuario = async (req: Request, res: Response) => {
   try {
     const query = `
       SELECT 
-        e.id,
-        e.nome,
-        e.prazo,
-        e.urgencia,
-        e.status,
-        e.ordem,
+        e.id, e.nome, e.prazo, e.urgencia, e.status, e.ordem,
         p.nome AS processo_nome
       FROM etapas e
       JOIN processos p ON p.id = e.processo_id
@@ -35,9 +30,7 @@ export const getTarefasPorUsuario = async (req: Request, res: Response) => {
     return res.json(result.rows);
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ error: "Erro ao buscar tarefas do usuário" });
+    return res.status(500).json({ error: "Erro ao buscar tarefas do usuário" });
   }
 };
 
@@ -49,10 +42,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
   try {
     // 1) Finalizar etapa atual
     const result = await pool.query(
-      `UPDATE etapas
-       SET status = 'finalizada'
-       WHERE id = $1
-       RETURNING *`,
+      `UPDATE etapas SET status = 'finalizada' WHERE id = $1 RETURNING *`,
       [id]
     );
 
@@ -73,22 +63,17 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
       [etapaFinalizada.processo_id, etapaFinalizada.ordem + 1]
     );
 
-    // 3) Criar notificação + enviar e-mail + WhatsApp
+    // 3) Criar notificação + Enviar E-mail + Disparar Webhook n8n
     if ((nextEtapa.rowCount ?? 0) > 0 && nextEtapa.rows[0].usuario_id) {
       const proxima = nextEtapa.rows[0];
 
       // Salva notificação no banco
       await pool.query(
-        `INSERT INTO notificacoes (usuario_id, etapa_id, mensagem)
-         VALUES ($1, $2, $3)`,
-        [
-          proxima.usuario_id,
-          proxima.id,
-          `Você tem uma nova tarefa: ${proxima.nome} no processo`,
-        ]
+        `INSERT INTO notificacoes (usuario_id, etapa_id, mensagem) VALUES ($1, $2, $3)`,
+        [proxima.usuario_id, proxima.id, `Você tem uma nova tarefa: ${proxima.nome}`]
       );
 
-      // Busca contato do usuário responsável (email + telefone)
+      // Busca dados do usuário
       const { rows: usuarioRows } = await pool.query(
         `SELECT email, nome, telefone FROM usuarios WHERE id = $1`,
         [proxima.usuario_id]
@@ -101,54 +86,30 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           telefone?: string;
         };
 
-        const corpoEmail = [
-          `Olá ${contato.nome ?? ""},`,
-          `Você recebeu uma nova tarefa: ${proxima.nome}.`,
-          `Acesse o sistema para mais detalhes:`,
-          BASE_URL,
-        ].join("\n\n");
-
-        // Executa os envios em paralelo
-        const jobs: Promise<any>[] = [];
-
-        // E-mail
+        // --- ENVIO DE EMAIL ---
         if (contato.email) {
-          jobs.push(EmailService.enviarEmail(contato.email, [corpoEmail]));
-        }
-
-        // WhatsApp (template aprovado)
-        if (contato.telefone) {
-          jobs.push(
-            WhatsappService.sendTemplate({
-              to: contato.telefone,
-              template: "aviso_funcionario",
-              lang: "pt_BR",
-              bodyParams: [contato.nome ?? "", proxima.nome],
-              buttonParams: [
-                {
-                  index: 0,
-                  sub_type: "url",
-                  // FIX: "login" é um parâmetro seguro que gera URL válida
-                  parameters: ["login"], 
-                },
-              ],
-            })
+          const corpoEmail = [
+            `Olá ${contato.nome ?? ""},`,
+            `Você recebeu uma nova tarefa: ${proxima.nome}.`,
+            `Acesse o sistema:`,
+            BASE_URL,
+          ].join("\n\n");
+          
+          // Envia email sem travar a thread (catch no final)
+          EmailService.enviarEmail(contato.email, [corpoEmail]).catch(err => 
+            console.error("Erro email:", err)
           );
         }
 
-        const results = await Promise.allSettled(jobs);
-        results.forEach((r, i) => {
-          if (r.status === "fulfilled") {
-            if (i === 0 && contato.email)
-              console.log(`📧 E-mail enviado para ${contato.email}`);
-            if (i !== 0 && contato.telefone)
-              console.log(
-                `💬 WhatsApp (template) enviado para ${contato.telefone}`
-              );
-          } else {
-            console.error(`❌ Falha ao notificar (canal ${i}):`, r.reason);
-          }
-        });
+        // --- DISPARO WEBHOOK N8N (WhatsApp) ---
+        if (contato.telefone) {
+          await N8nService.notificarNovaTarefa({
+            nome: contato.nome ?? "Colaborador",
+            telefone: contato.telefone,
+            tarefa: proxima.nome,
+            link: BASE_URL // Manda a URL base limpa
+          });
+        }
       }
     }
 
@@ -164,16 +125,12 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
 
 // Contar etapas pendentes
 export const contarEtapasPendentes = async (req: Request, res: Response) => {
-  const usuario_id = req.params.usuario_id; // ou pegar do JWT
-
+  const usuario_id = req.params.usuario_id;
   try {
     const result = await pool.query(
-      `SELECT COUNT(*) 
-       FROM etapas 
-       WHERE usuario_id = $1 AND status IN ('em andamento')`,
+      `SELECT COUNT(*) FROM etapas WHERE usuario_id = $1 AND status IN ('em andamento')`,
       [usuario_id]
     );
-
     res.json({ quantidade: parseInt(result.rows[0].count, 10) });
   } catch (error) {
     console.error(error);
