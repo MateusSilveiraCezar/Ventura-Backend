@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // ⚠️ COLOQUE AQUI A URL DO SEU WEBHOOK (Production URL) DO N8N
-const N8N_WEBHOOK_URL = "https://seu-n8n.com/webhook/notificacao-tarefa";
+const N8N_WEBHOOK_URL = "https://n8n.mapech.com.br/webhook-test/ventura";
 
 export const N8nService = {
   async notificarNovaTarefa(dados: {
