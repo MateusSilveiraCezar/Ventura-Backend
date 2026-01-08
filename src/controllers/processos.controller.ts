@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import N8nService from "../services/n8n.service"; // <--- Novo serviço
+import { N8nService } from "../services/n8n.service"; // <--- Novo serviço
 
 const BASE_URL = "https://www.painelventura.com.br";
 
