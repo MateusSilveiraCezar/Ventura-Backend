@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import { N8nService } from "../services/n8n.service"; // <--- Novo serviço
+import { N8nService } from "../services/n8n.service"; // ✅ Correção 1: Importação com chaves
 
 const BASE_URL = "https://www.painelventura.com.br";
 
-// Lista todos os processos
 export async function listarProcessos(req: Request, res: Response) {
   try {
     const { rows: processos } = await pool.query(`
@@ -19,7 +18,8 @@ export async function listarProcessos(req: Request, res: Response) {
           'Concluído'
         ) AS etapa_atual
       FROM processos p
-      JOIN clientes c ON c.id = p.cliente_id
+      JOIN clientes c 
+        ON c.id = p.cliente_id
       ORDER BY p.id;
     `);
 
@@ -49,18 +49,28 @@ export async function listarProcessos(req: Request, res: Response) {
   }
 };
 
-// Buscar processo pelo ID
 export const buscarProcessoPorId = async (req: Request, res: Response) => {
   const processo_id = req.params.id;
   try {
     const query = `
-      SELECT p.*,
-        json_build_object('id', c.id, 'nome', c.nome, 'telefone', c.telefone) AS cliente,
+      SELECT 
+        p.*,
+        json_build_object(
+          'id', c.id,
+          'nome', c.nome,
+          'telefone', c.telefone
+        ) AS cliente,
         COALESCE(
           json_agg(
             json_build_object(
-              'id', e.id, 'nome', e.nome, 'status', e.status, 'prazo', e.prazo,
-              'usuario_id', e.usuario_id, 'urgencia', e.urgencia, 'observacoes', e.observacoes, 'ordem', e.ordem
+              'id', e.id,
+              'nome', e.nome,
+              'status', e.status,
+              'prazo', e.prazo,
+              'usuario_id', e.usuario_id,
+              'urgencia', e.urgencia,
+              'observacoes', e.observacoes,
+              'ordem', e.ordem
             ) ORDER BY e.ordem
           ) FILTER (WHERE e.id IS NOT NULL),
           '[]'
@@ -80,7 +90,6 @@ export const buscarProcessoPorId = async (req: Request, res: Response) => {
   }
 };
 
-// Criar processo completo
 export const criarProcessoCompleto = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
@@ -139,10 +148,10 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
           
           if (contato.email) {
              const corpoEmail = [`Olá ${contato.nome}, tarefa: ${etapa.nome}`, BASE_URL].join("\n\n");
+             // ✅ Aqui já estava correto, mantendo
              EmailService.enviarEmail(contato.email, [corpoEmail]).catch(console.error);
           }
 
-          // --- WEBHOOK N8N ---
           if (contato.telefone) {
             await N8nService.notificarNovaTarefa({
               nome: contato.nome ?? "Colaborador",
@@ -158,17 +167,16 @@ export const criarProcessoCompleto = async (req: Request, res: Response) => {
     }
 
     await client.query("COMMIT");
-    res.status(201).json({ message: "Processo criado/atualizado com sucesso", cliente_id, processo_id });
+    res.status(201).json({ message: "Sucesso", cliente_id, processo_id });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("❌ Erro ao criar processo:", error);
-    res.status(500).json({ error: "Erro ao criar processo completo" });
+    console.error("Erro:", error);
+    res.status(500).json({ error: "Erro ao criar" });
   } finally {
     client.release();
   }
 };
 
-// Atualizar processo completo (PUT)
 export const atualizarProcessoCompleto = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
@@ -182,35 +190,74 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
 
     await client.query('BEGIN');
 
-    if (cliente) await client.query(`UPDATE clientes SET nome = $1, telefone = $2 WHERE id = (SELECT cliente_id FROM processos WHERE id = $3)`, [cliente.nome, cliente.telefone, processo_id]);
-    if (processo) await client.query(`UPDATE processos SET nome = $1, tipo_id = $2 WHERE id = $3`, [processo.nome, processo.tipo_id, processo_id]);
+    if (cliente) {
+      await client.query(
+        `UPDATE clientes SET nome = $1, telefone = $2 WHERE id = (SELECT cliente_id FROM processos WHERE id = $3)`,
+        [cliente.nome, cliente.telefone, processo_id]
+      );
+    }
+
+    if (processo) {
+      await client.query(
+        `UPDATE processos SET nome = $1, tipo_id = $2 WHERE id = $3`,
+        [processo.nome, processo.tipo_id, processo_id]
+      );
+    }
 
     for (const etapa of etapas) {
-      const resEtapa = await client.query(`SELECT id, status, ordem FROM etapas WHERE processo_id = $1 AND nome = $2`, [processo_id, etapa.nome]);
+      const resEtapa = await client.query(
+        `SELECT id, status, ordem FROM etapas WHERE processo_id = $1 AND nome = $2`,
+        [processo_id, etapa.nome]
+      );
+
       if ((resEtapa.rowCount ?? 0) > 0) {
         const etapa_id = resEtapa.rows[0].id;
         const statusAtual = resEtapa.rows[0].status;
         let novoStatus = statusAtual;
-        if (etapa.status && statusAtual !== 'finalizada') novoStatus = etapa.status;
+        
+        if (etapa.status && statusAtual !== 'finalizada') {
+          novoStatus = etapa.status;
+        }
 
         await client.query(
-          `UPDATE etapas SET usuario_id = $1, prazo = $2, urgencia = $3, observacoes = $4, status = $5, ordem = $6 WHERE id = $7`,
-          [etapa.usuario_id, etapa.prazo, etapa.urgencia, etapa.observacoes, novoStatus, resEtapa.rows[0].ordem, etapa_id]
+          `UPDATE etapas
+           SET usuario_id = $1, prazo = $2, urgencia = $3, observacoes = $4,
+               status = $5, ordem = $6
+           WHERE id = $7`,
+          [
+            etapa.usuario_id,
+            etapa.prazo,
+            etapa.urgencia,
+            etapa.observacoes,
+            novoStatus,
+            resEtapa.rows[0].ordem,
+            etapa_id
+          ]
         );
 
         // Se status mudou para 'em andamento', notifica
         if (novoStatus === "em andamento" && etapa.usuario_id) {
-          await client.query(`INSERT INTO notificacoes (usuario_id, etapa_id, mensagem) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [etapa.usuario_id, etapa_id, `Nova tarefa: ${etapa.nome}`]);
+          await client.query(
+            `INSERT INTO notificacoes (usuario_id, etapa_id, mensagem)
+             VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING`,
+            [etapa.usuario_id, etapa_id, `Nova tarefa: ${etapa.nome}`]
+          );
           
-          const { rows: usuarioRows } = await client.query(`SELECT email, nome, telefone FROM usuarios WHERE id = $1`, [etapa.usuario_id]);
+          const { rows: usuarioRows } = await client.query(
+            `SELECT email, nome, telefone FROM usuarios WHERE id = $1`,
+            [etapa.usuario_id]
+          );
+
           if (usuarioRows.length > 0) {
             const contato = usuarioRows[0];
             
             if (contato.email) {
-                EmailService.enviarEmail(contato.email, [`Nova tarefa: ${etapa.nome}`, BASE_URL].join("\n\n")).catch(console.error);
+                const corpoEmail = [`Nova tarefa: ${etapa.nome}`, BASE_URL].join("\n\n");
+                // ✅ Correção 2: Adicionados os colchetes [] em volta de corpoEmail
+                EmailService.enviarEmail(contato.email, [corpoEmail]).catch(console.error);
             }
 
-            // --- WEBHOOK N8N ---
             if (contato.telefone) {
               await N8nService.notificarNovaTarefa({
                 nome: contato.nome ?? "Colaborador",
@@ -226,6 +273,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
 
     await client.query('COMMIT');
     res.status(200).json({ message: 'Processo atualizado com sucesso' });
+
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Erro ao atualizar:', error);
