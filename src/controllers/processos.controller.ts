@@ -375,7 +375,7 @@ export const atualizarProcessoCompleto = async (req: Request, res: Response) => 
                     { 
                       index: 0, 
                       sub_type: "url", 
-                      parameters: ["/"] // FIX: Envia apenas "/" para o link base
+                      parameters: ["?ref=app"] // FIX: Envia apenas "/" para o link base
                     }, 
                   ],
                 })

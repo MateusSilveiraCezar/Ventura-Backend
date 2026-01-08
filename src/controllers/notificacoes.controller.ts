@@ -1,8 +1,10 @@
-// controllers/notificacoes.controller.ts
 import { Request, Response } from "express";
 import { pool } from "../database/db";
 import EmailService from "../services/email.service";
-import WhatsappService from "../services/whatsapp.service"; // integração WA
+import WhatsappService from "../services/whatsapp.service";
+
+// URL Base limpa
+const BASE_URL = "https://www.painelventura.com.br";
 
 // Buscar todas as tarefas pendentes ou em andamento de um usuário
 export const getTarefasPorUsuario = async (req: Request, res: Response) => {
@@ -39,7 +41,7 @@ export const getTarefasPorUsuario = async (req: Request, res: Response) => {
   }
 };
 
-// Finalizar uma tarefa
+// Finalizar uma tarefa e notificar a próxima
 export const finalizarTarefa = async (req: Request, res: Response) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: "ID da tarefa é obrigatório" });
@@ -86,7 +88,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
         ]
       );
 
-      // Busca contato do usuário responsável (email + telefone)
+      // Busca contato do usuário responsável
       const { rows: usuarioRows } = await pool.query(
         `SELECT email, nome, telefone FROM usuarios WHERE id = $1`,
         [proxima.usuario_id]
@@ -99,17 +101,6 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           telefone?: string;
         };
 
-        // Base do seu painel/app
-        const BASE_URL = "https://www.painelventura.com.br/login";
-
-        // URL COMPLETA (para e-mail) — clique vai direto para a etapa
-        const urlCompleta = `${BASE_URL}/`;
-
-        // SUFIXO para o botão DINÂMICO do template ({{1}})
-        // Se seu botão for ESTÁTICO, envie a URL COMPLETA no parameters (ver comentário mais abaixo).
-        const urlSuffix = `login`;
-
-        const assuntoEmail = `Nova tarefa: ${proxima.nome}`;
         const corpoEmail = [
           `Olá ${contato.nome ?? ""},`,
           `Você recebeu uma nova tarefa: ${proxima.nome}.`,
@@ -117,7 +108,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           BASE_URL,
         ].join("\n\n");
 
-        // Executa os envios em paralelo; falha de um canal não bloqueia o outro
+        // Executa os envios em paralelo
         const jobs: Promise<any>[] = [];
 
         // E-mail
@@ -125,30 +116,22 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
           jobs.push(EmailService.enviarEmail(contato.email, [corpoEmail]));
         }
 
-        // WhatsApp (template aprovado)
+        // WhatsApp
         if (contato.telefone) {
           jobs.push(
             WhatsappService.sendTemplate({
               to: contato.telefone,
-              template: "aviso_funcionario", // nome do template no Manager
+              template: "aviso_funcionario",
               lang: "pt_BR",
-              // Corpo do template:
-              // "Olá {{1}}, você recebeu uma nova tarefa: {{2}}. Acesse o sistema para mais detalhes."
               bodyParams: [contato.nome ?? "", proxima.nome],
-              // Botão de URL DINÂMICA — o template tem base + {{1}}
               buttonParams: [
                 {
                   index: 0,
                   sub_type: "url",
-                  parameters: [BASE_URL], // <<<< só o sufixo "{{1}}"
+                  // FIX: Envia apenas "/" para que o link fique na raiz
+                  parameters: ["?ref=app"], 
                 },
               ],
-
-              // >>> SE O SEU BOTÃO FOR **ESTÁTICO** (sem {{1}}) <<<
-              // troque o bloco acima por:
-              // buttonParams: [
-              //   { index: 0, sub_type: "url", parameters: [urlCompleta] },
-              // ],
             })
           );
         }
@@ -181,7 +164,7 @@ export const finalizarTarefa = async (req: Request, res: Response) => {
 
 // Contar etapas pendentes
 export const contarEtapasPendentes = async (req: Request, res: Response) => {
-  const usuario_id = req.params.usuario_id; // ou pegar do JWT
+  const usuario_id = req.params.usuario_id;
 
   try {
     const result = await pool.query(
